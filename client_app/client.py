@@ -23,7 +23,7 @@ max_position_embeddings = 1024      # 1024 for gpt2, 2048 for gpt2-large
 client_model = CustomGPT2Embedding(vocalb_size, embedding_dim, max_position_embeddings)
 
 try:
-    client_model.load_state_dict(torch.load("gpt2_head.pth", map_location=torch.device('cpu')))
+    client_model.load_state_dict(torch.load("assets/gpt2_head.pth", map_location=torch.device('cpu')))
     client_model.eval()
     print("Head model loaded successfully")
 except Exception as e:

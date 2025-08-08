@@ -1,0 +1,28 @@
+[project]
+name = "Split_Inference_Client"
+version = "1.0.0"
+description = "GPT-2 Split inference client"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name="Dharam singh meena", email="dharam.meena@samsung.com"}
+]
+dependencies = [
+    "flet",
+    "transformers",
+    "torch"
+]
+
+[tool.flet]
+org="com.samsung"
+product="SplitInferenceClient"
+company = "Samsung"
+copyright = "Copyright (C) 2025 by Samsung"
+build_number = 1
+
+[tool.flet.app]
+path = "."
+module = "client"
+
+[tool.flet.permissions]
+permissions = ["internet"]
