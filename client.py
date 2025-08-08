@@ -2,14 +2,33 @@ import flet as ft
 import socket
 import pickle
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch.nn as nn
+from transformers import AutoTokenizer
+
+from head_model_arch import CustomGPT2Embedding
 
 SERVER_IP = "172.17.255.44"
 SERVER_PORT = 12345
 
-MODEL_NAME = "gpt2-large"
+MODEL_NAME = "gpt2"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token  
+
+# Load the Head model
+vocalb_size = tokenizer.vocab_size
+embedding_dim = 768                 # 768 for gpt2, 1024 for gpt2-large
+max_position_embeddings = 1024      # 1024 for gpt2, 2048 for gpt2-large
+
+client_model = CustomGPT2Embedding(vocalb_size, embedding_dim, max_position_embeddings)
+
+try:
+    client_model.load_state_dict(torch.load("gpt2_head.pth", map_location=torch.device('cpu')))
+    client_model.eval()
+    print("Head model loaded successfully")
+except Exception as e:
+    print(f"Error loading head model: {e}")
+
 
 def main(page: ft.Page):
     page.title = "GPT-2 Split Inference Client"
@@ -25,11 +44,11 @@ def main(page: ft.Page):
         page.update()
 
         # 1. Tokenizations and embeddings on the Client
-        inputs = tokenizer(prompt, return_tensors="pt")
+        inputs = tokenizer(prompt, return_tensors="pt", padding=True)
         print("Tokenization complete, inputs:", inputs)
 
         with torch.no_grad():
-            embeddings = model.get_input_embeddings()(inputs['input_ids'])
+            embeddings = client_model(inputs['input_ids'])
         print("Embeddings generated, shape:", embeddings.shape)
 
         attention_mask = inputs['attention_mask']

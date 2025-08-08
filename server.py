@@ -8,7 +8,7 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 12345
 
-MODEL_NAME = "gpt2-large"
+MODEL_NAME = "gpt2"
 tokenizer = GPT2Tokenizer.from_pretrained(MODEL_NAME)
 model = GPT2LMHeadModel.from_pretrained(MODEL_NAME)
 
@@ -49,7 +49,7 @@ def handle_client(client_socket, addr):
                 num_return_sequences=1,
                 do_sample=True,
                 top_k=50,
-                temperature=0.7,
+                temperature=0.5,
                 pad_token_id=tokenizer.eos_token_id
             )
 
