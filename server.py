@@ -4,6 +4,8 @@ import threading
 import  torch
 import pickle
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
+from transformers import TextIteratorStreamer
+import threading
 
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 12345
@@ -40,24 +42,35 @@ def handle_client(client_socket, addr):
         attention_mask = data_from_client['attention_mask']
         print("Received embeddings and attention mask from client.")
 
-        # use embeddings to generate tokens
-        with torch.no_grad():
-            output = model.generate(
-                inputs_embeds=embeddings,
-                attention_mask=attention_mask,
-                max_new_tokens=50,
-                num_return_sequences=1,
-                do_sample=True,
-                top_k=50,
-                temperature=0.5,
-                pad_token_id=tokenizer.eos_token_id
-            )
+        streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True)
 
-            for token_id in output[0]:
-                token = tokenizer.decode(token_id)
-                generated_tokens_list.controls.append(ft.Text(f"Generated: {token}"))
-                client_socket.sendall(token.encode('utf-8'))
-                server_status_text.page.update()
+        # Set up generation arguments
+        generation_kwargs = {
+            "inputs_embeds": embeddings,
+            "attention_mask": attention_mask,
+            "max_new_tokens": 50,
+            "num_return_sequences": 1,
+            "do_sample": True,
+            "top_k": 50,
+            "temperature": 0.7,
+            "pad_token_id": tokenizer.eos_token_id,
+            "streamer": streamer
+        }
+
+        # Run the model.generate in a separate thread, so the main thread can handle streaming
+        threading.Thread(target=model.generate, kwargs=generation_kwargs).start()
+
+        i = 0
+        for token_text in streamer:
+            # Print on server UI
+            generated_tokens_list.controls.append(ft.Text(f"Generated {i}: {token_text}"))
+            server_status_text.page.update()
+
+            # send to client
+            client_socket.send(token_text.encode('utf-8'))
+            i += 1
+
+        print("Generation complete, tokens sent to client.")
     
     except Exception as e:
         print(f"[Server] Error handling client {addr}: {e}")
@@ -84,15 +97,16 @@ def start_server(page: ft.Page):
             client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
             client_handler.start()
     
-    page.add(
-        ft.Column(
+    # The main column of the page
+    main_column = ft.Column(
             [
                 server_status_text,
                 ft.Text("Generated Tokens:"),
                 generated_tokens_list,
-            ]
+            ],
+            expand=True,
         )
-    )
+    page.add(main_column)
 
     # Start listening for connections in a separate thread
     threading.Thread(target=listen_for_connections, daemon=True).start()
