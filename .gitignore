@@ -1,2 +1,4 @@
 *.pth
+*.npy
 __pycache__/
+build/

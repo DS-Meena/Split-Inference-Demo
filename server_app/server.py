@@ -38,8 +38,13 @@ def handle_client(client_socket, addr):
             received_data += chunk
         
         data_from_client = pickle.loads(received_data)
-        embeddings = data_from_client['embeddings']
-        attention_mask = data_from_client['attention_mask']
+        embeddings_np = data_from_client['embeddings']
+        attention_mask_np = data_from_client['attention_mask']
+
+        # Convert numpy arrays to torch tensors
+        embeddings = torch.from_numpy(embeddings_np).float()
+        attention_mask = torch.from_numpy(attention_mask_np).long()
+
         print("Received embeddings and attention mask from client.")
 
         streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True)

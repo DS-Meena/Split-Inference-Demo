@@ -9,8 +9,8 @@ authors = [
 ]
 dependencies = [
     "flet",
-    "transformers",
-    "torch"
+    "numpy",
+    "transformers"
 ]
 
 [tool.flet]
