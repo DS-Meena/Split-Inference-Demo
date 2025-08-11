@@ -10,7 +10,7 @@ import threading
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 12345
 
-MODEL_NAME = "gpt2"
+MODEL_NAME = "gpt2-large"
 tokenizer = GPT2Tokenizer.from_pretrained(MODEL_NAME)
 model = GPT2LMHeadModel.from_pretrained(MODEL_NAME)
 

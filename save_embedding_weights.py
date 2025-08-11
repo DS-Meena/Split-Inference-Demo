@@ -2,7 +2,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import numpy as np
 
-MODEL_NAME = "gpt2"
+MODEL_NAME = "gpt2-large"
 full_model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 

@@ -17,9 +17,8 @@ tokenizer = CustomGPT2Tokenizer(
 )
 
 # Load the Head model
-vocalb_size = tokenizer.vocab_size
-embedding_dim = 768                 # 768 for gpt2, 1024 for gpt2-large
-max_position_embeddings = 1024      # 1024 for gpt2, 2048 for gpt2-large
+embedding_dim = 1024                 # 768 for gpt2, 1024 for gpt2-large
+max_position_embeddings = 2048      # 1024 for gpt2, 2048 for gpt2-large
 
 client_model = NumPyEmbedding(
     token_embeddings_path="assets/token_embeddings.npy",

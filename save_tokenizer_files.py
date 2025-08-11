@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
+tokenizer = AutoTokenizer.from_pretrained("gpt2-large")
 
 output_dir = "client_app/assets"
 tokenizer.save_pretrained(output_dir)
