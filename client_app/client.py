@@ -2,16 +2,19 @@ import flet as ft
 import socket
 import pickle
 import numpy as np
-from transformers import AutoTokenizer
+
+from custom_bpe_tokenizer import CustomGPT2Tokenizer
 from head_model_arch import NumPyEmbedding
 
 SERVER_IP = "172.17.255.44"
 SERVER_PORT = 12345
 
-MODEL_NAME = "gpt2"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token  
+tokenizer = CustomGPT2Tokenizer(
+    vocab_file="assets/vocab.json",
+    merges_file="assets/merges.txt",
+    special_tokens_map_file="assets/special_tokens_map.json",
+    tokenizer_config_file="assets/tokenizer_config.json"
+)
 
 # Load the Head model
 vocalb_size = tokenizer.vocab_size
@@ -38,7 +41,7 @@ def main(page: ft.Page):
         page.update()
 
         # 1. Tokenizations and embeddings on the Client
-        inputs = tokenizer(prompt, return_tensors="np", padding=True)
+        inputs = tokenizer.tokenize(prompt, padding=False)
         print("Tokenization complete, inputs:", inputs)
 
         embeddings_np = client_model(inputs['input_ids'])

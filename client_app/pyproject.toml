@@ -10,12 +10,12 @@ authors = [
 dependencies = [
     "flet",
     "numpy",
-    "transformers"
+    "regex"
 ]
 
 [tool.flet]
 org="com.samsung"
-product="SplitInferenceClient"
+product="NewNameForSplit"
 company = "Samsung"
 copyright = "Copyright (C) 2025 by Samsung"
 build_number = 1
