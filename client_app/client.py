@@ -1,34 +1,30 @@
 import flet as ft
 import socket
 import pickle
-import torch
-import torch.nn as nn
-from transformers import AutoTokenizer
+import numpy as np
 
-from head_model_arch import CustomGPT2Embedding
+from custom_bpe_tokenizer import CustomGPT2Tokenizer
+from head_model_arch import NumPyEmbedding
 
 SERVER_IP = "172.17.255.44"
 SERVER_PORT = 12345
 
-MODEL_NAME = "gpt2"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token  
+tokenizer = CustomGPT2Tokenizer(
+    vocab_file="assets/vocab.json",
+    merges_file="assets/merges.txt",
+    special_tokens_map_file="assets/special_tokens_map.json",
+    tokenizer_config_file="assets/tokenizer_config.json"
+)
 
 # Load the Head model
-vocalb_size = tokenizer.vocab_size
-embedding_dim = 768                 # 768 for gpt2, 1024 for gpt2-large
-max_position_embeddings = 1024      # 1024 for gpt2, 2048 for gpt2-large
+embedding_dim = 1024                 # 768 for gpt2, 1024 for gpt2-large
+max_position_embeddings = 2048      # 1024 for gpt2, 2048 for gpt2-large
 
-client_model = CustomGPT2Embedding(vocalb_size, embedding_dim, max_position_embeddings)
-
-try:
-    client_model.load_state_dict(torch.load("assets/gpt2_head.pth", map_location=torch.device('cpu')))
-    client_model.eval()
-    print("Head model loaded successfully")
-except Exception as e:
-    print(f"Error loading head model: {e}")
-
+client_model = NumPyEmbedding(
+    token_embeddings_path="assets/token_embeddings.npy",
+    position_embeddings_path="assets/position_embeddings.npy",
+    max_position_embeddings=max_position_embeddings
+)
 
 def main(page: ft.Page):
     page.title = "GPT-2 Split Inference Client"
@@ -44,17 +40,16 @@ def main(page: ft.Page):
         page.update()
 
         # 1. Tokenizations and embeddings on the Client
-        inputs = tokenizer(prompt, return_tensors="pt", padding=True)
+        inputs = tokenizer.tokenize(prompt, padding=False)
         print("Tokenization complete, inputs:", inputs)
 
-        with torch.no_grad():
-            embeddings = client_model(inputs['input_ids'])
-        print("Embeddings generated, shape:", embeddings.shape)
+        embeddings_np = client_model(inputs['input_ids'])
+        print("Embeddings generated, shape:", embeddings_np.shape)
 
-        attention_mask = inputs['attention_mask']
+        attention_mask_np = inputs['attention_mask']
         data_to_send = {
-            'embeddings': embeddings,
-            'attention_mask': attention_mask
+            'embeddings': embeddings_np,
+            'attention_mask': attention_mask_np
         }
         
         # 2. Serialize and send embeddings to the server
