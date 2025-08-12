@@ -107,10 +107,6 @@ class CustomGPT2Tokenizer:
             # or if the word becomes a single token, we can break.
             if len(word_list) == 1:
                 break
-            # Optional: Check if word_list stopped changing (may indicate a bug or end of merges)
-            # if previous_word_list == word_list:
-            #     print("Warning: Word list did not change, breaking to avoid infinite loop.")
-            #     break
 
         # Join the final list of tokens back into a string, separated by spaces
         # GPT-2 typically uses space-separated tokens in the vocabulary for subword units
