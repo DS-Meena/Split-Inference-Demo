@@ -1,4 +1,5 @@
 *.pth
 *.npy
+*.tflite
 __pycache__/
 build/
