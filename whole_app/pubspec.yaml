@@ -1,0 +1,25 @@
+name: gpt2_app
+description: An app attempting to run full GPT-2 model on-device via TFLite.
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  tflite_flutter: ^0.10.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/gpt2.tflite
+    - assets/vocab.json # Tokenizer files
+    - assets/merges.txt
+    - assets/tokenizer_config.json
+    - assets/special_tokens_map.json
