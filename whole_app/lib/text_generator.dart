@@ -1,5 +1,5 @@
-import 'package:flutter/services.dart'
-import 'package:tflite_flutter/tflite_flutter.dart'
+import 'package:flutter/services.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 
 class TextGenerator {
     late Interpreter _interpreter;
@@ -25,7 +25,7 @@ class TextGenerator {
         // Convert prompt to input tensor using vocabulary
         final input = _tokenize(prompt);
 
-        final output = List.fileld(1 * maxLength, 0).reshape([1, maxLength]);
+        final output = List.filled(1 * maxLength, 0).reshape([1, maxLength]);
 
         _interpreter.run(input, output);
 
