@@ -1,19 +1,17 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flet/flet.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:provider/provider.dart'; // Import Provider
+import 'package:provider/provider.dart';
 
-// Global interpreter instance
 Interpreter? _interpreter;
 bool _modelLoaded = false;
-final MethodChannel _platformChannel = const MethodChannel('com.example.gpt2tflite/tflite'); // Match Python's channel name
+final MethodChannel _platformChannel = const MethodChannel('com.example.gpt2tflite/tflite');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // FletApp needs access to the FletPage context,
-  // so we wrap it with a Provider.
   runApp(
     Provider<FletPage>(
       create: (_) => FletPage(
@@ -27,19 +25,18 @@ void main() async {
 Future<bool> _loadModel(FletPage page) async {
   try {
     if (_interpreter != null) {
-      _interpreter!.close(); // Close existing interpreter if any
+      _interpreter!.close();
     }
-    // Load model from assets
     _interpreter = await Interpreter.fromAsset('gpt2.tflite');
     _modelLoaded = true;
     print("TFLite Model loaded successfully in Dart.");
-    // Communicate model loading status to Python
+    // Send model loaded status back to Python
     page.sendMethodCall('modelLoaded', {'success': true, 'message': "TFLite model loaded successfully!"});
     return true;
   } catch (e) {
     _modelLoaded = false;
     print("Error loading TFLite model: $e");
-    // Communicate model loading failure to Python
+    // Send model loaded failure status back to Python
     page.sendMethodCall('modelLoaded', {'success': false, 'error': e.toString(), 'message': "Error loading TFLite model: $e"});
     return false;
   }
@@ -47,30 +44,25 @@ Future<bool> _loadModel(FletPage page) async {
 
 Future<Map<String, dynamic>> _runInference(FletPage page, Map<String, dynamic> arguments) async {
     if (!_modelLoaded || _interpreter == null) {
+        // Send inference failure status back to Python
         page.sendMethodCall('tfliteResult', {'success': false, 'error': 'TFLite model not loaded.'});
         return {'success': false, 'error': 'TFLite model not loaded.'};
     }
 
     try {
-        final inputIdsBytes = arguments['input_ids_bytes'] as List<dynamic>; // Cast to List<dynamic> then to Uint8List
+        // arguments are passed directly via the method call
+        final inputIdsBytes = arguments['input_ids_bytes'] as List<dynamic>;
         final inputShape = List<int>.from(arguments['input_shape']);
         final outputShape = List<int>.from(arguments['output_shape']);
 
-        // Allocate input buffer
-        final inputBuffer = Uint8List.fromList(inputIdsBytes); // Direct conversion
-
-        // Prepare output buffer. Adjust the output type based on your model's specific output.
-        // GPT-2 typically outputs float32 logits.
+        final inputBuffer = Uint8List.fromList(inputIdsBytes.cast<int>());
         final outputBuffer = Float32List(outputShape.reduce((a, b) => a * b)).buffer;
 
-        // Resize input tensors
-        _interpreter!.resizeInput(0, inputShape); // Resize the first (and likely only) input tensor
-        _interpreter!.allocateTensors(); // Allocate tensors after resizing
+        _interpreter!.resizeInput(0, inputShape);
+        _interpreter!.allocateTensors();
 
-        // Run inference
         _interpreter!.run(inputBuffer, outputBuffer);
 
-        // Convert output to a Python-compatible format (e.g., list of floats)
         final List<double> outputList = outputBuffer.asFloat32List().toList();
 
         return {'success': true, 'output': outputList};
@@ -88,52 +80,40 @@ class FletApp extends StatefulWidget {
 }
 
 class _FletAppState extends State<FletApp> {
-    FletPage? _fletPage; // Store the FletPage instance
+    FletPage? _fletPage;
 
     @override
     void initState() {
         super.initState();
-        // After the first frame is rendered, handle Python requests.
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
             _fletPage = Provider.of<FletPage>(context, listen: false);
-            _handlePythonRequests();
+            _setupMethodCallHandler();
         });
     }
 
-    Future<void> _handlePythonRequests() async {
-        // This loop constantly checks Python flags
-        while(true) {
-            if (_fletPage != null && _fletPage!.platform_data != null) {
-                final Map<String, dynamic>? pyFlags = _fletPage!.platform_data!['py_flags'] as Map<String, dynamic>?;
-
-                if (pyFlags != null) {
-                    // Handle LoadModel request
-                    if (pyFlags['load_model_request'] == true) {
-                        print("Dart: Received loadModel request from Python.");
-                        await _loadModel(_fletPage!); // Pass the FletPage instance
-                        pyFlags['load_model_request'] = false; // Reset the flag
-                        _fletPage!.update(); // Notify Python that the flag is reset
-                    }
-
-                    // Handle run inference request
-                    if (pyFlags['run_inference_request'] == true) {
-                        print("Dart: Received runInference request from Python.");
-                        final arguments = _fletPage!.platform_data!['inference_input_data'] as Map<String, dynamic>?;
-
-                        if (arguments != null) {
-                            final result = await _runInference(_fletPage!, arguments); // Pass FletPage and arguments
-                            _fletPage!.sendMethodCall('tfliteResult', result);
-                        } else {
-                            _fletPage!.sendMethodCall('tfliteResult', {'success': false, 'error': 'No inference data provided.'});
-                        }
-                        pyFlags['run_inference_request'] = false;
-                        _fletPage!.platform_data!['inference_input_data'] = null; // Clear data
-                        _fletPage!.update(); // Notify Python that flags are reset
-                    }
-                }
+    void _setupMethodCallHandler() {
+        _platformChannel.setMethodCallHandler((call) async {
+            if (_fletPage == null) {
+                print("FletPage is not initialized yet.");
+                return Future.error('FletPage not ready.');
             }
-            await Future.delayed(const Duration(milliseconds: 100));
-        }
+
+            switch (call.method) {
+                case 'loadModel':
+                    print("Dart: Received loadModel call from Python.");
+                    await _loadModel(_fletPage!);
+                    break;
+                case 'runInference':
+                    print("Dart: Received runInference call from Python.");
+                    final arguments = call.arguments as Map<String, dynamic>;
+                    final result = await _runInference(_fletPage!, arguments);
+                    _fletPage!.sendMethodCall('tfliteResult', result);
+                    break;
+                default:
+                    return Future.error('Method not found: ${call.method}');
+            }
+            return null; // Method handled successfully
+        });
     }
 
     @override
