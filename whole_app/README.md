@@ -1,9 +1,16 @@
-# Whole App
+# whole_app
 
-### Understanding Async Methods
+A new Flutter project.
 
-We uses Python's `asyncio` library to handle operations that might take time (like network requests, disk I/O, or calling native methods) without blocking the entire user interface.
+## Getting Started
 
-- `async def`: Defines a coroutine. This is a function that can be paused and resumed. When a coroutine needs to wait for something (like a network response or a method call to Dart), it `await`s.
-- `await`: Used inside an `async def` function. It pauses the execution of the current coroutine until the awaited operation completes. While it's paused, the Flet event loop can switch to running other parts of app's UI or other tasks, keeping the UI responsive.
+This project is a starting point for a Flutter application.
 
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
