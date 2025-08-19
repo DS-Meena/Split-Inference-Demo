@@ -6,43 +6,72 @@ class TextGenerator {
     late Interpreter _interpreter;
     late Map<String, int> _vocab;
     late List<List<String>> _merges;
+    late int _outputSequenceLength;
+    late int _vocabSize;
 
     Future<void> loadModel() async {
         // Load the TFLite model
-        _interpreter = await Interpreter.fromAsset('assets/gpt2.tflite');
+        _interpreter = await Interpreter.fromAsset('assets/gpt2-full.tflite');
+        print('Input Tensor shape: ${_interpreter.getInputTensor(0).shape}');
+        print('Output Tensor shape: ${_interpreter.getOutputTensor(0).shape}');
+        print('Output Tensor type: ${_interpreter.getOutputTensor(0).type}');
 
         // Load the vocabulary file
         final String vocabString = await rootBundle.loadString('assets/vocab.json');
         _vocab = Map<String, int>.from(json.decode(vocabString));
-        
-        vocabString.split('\n').forEach((line) {
-            final parts = line.split(' ');
-            if (parts.length == 2) {
-                _vocab[parts[0]] = int.parse(parts[1]);
-            }
-        });
 
         final String mergesString = await rootBundle.loadString('assets/merges.txt');
         _merges = mergesString.split('\n').map((line) => line.split(' ')).toList();
+        
+        // Get and store the output tensor shape
+        final outputTensor = _interpreter.getOutputTensor(0);
+        _outputSequenceLength = outputTensor.shape[1]; // Should be 64
+        _vocabSize = outputTensor.shape[2]; // Should be 50257
+        print('Output Tensor shape: ${outputTensor.shape}');
     }
 
     String generateText(String prompt, {int maxLength = 50}) {
+        print("Enter generateText");
         // Convert prompt to input tensor using vocabulary
-        final inputTokens = _encode(prompt);
+        final inputTokens = _encode(prompt, expectedLength: 64);
 
-        final output = List.filled(1 * maxLength, 0).reshape([1, maxLength]);
+        final output = List.filled(1 * _outputSequenceLength * _vocabSize, 0.0).reshape([1, _outputSequenceLength, _vocabSize]);
 
+        print("Before inference: $inputTokens");
         _interpreter.run([inputTokens], output);
+        print("After inference");
+        print('output of interpreter is $output');
 
-        // convert output tensor to generated text using vocabulary
-        final generatedIds = output[0].cast<int>();
-        final generatedText = _decode(generatedIds);
+        // process the output to get the generated Ids
+        List<int> generatedIds = [];
+        for (int i = 0; i < _outputSequenceLength; i++) {
+            double maxLogit = -double.infinity;
+            int predictedTokenId = 0;
+            for (int j = 0; j < _vocabSize; j++) {
+                if (output[0][i][j] > maxLogit) { // Assuming output is Float32, adjust type if needed
+                    maxLogit = output[0][i][j];
+                    predictedTokenId = j;
+                }
+            }
+            generatedIds.add(predictedTokenId);
+        }
+        print('GeneratedIds are: $generatedIds');
 
-        return generatedText;
+        final actualGeneratedText = _decode(generatedIds);
+        print('actualGeneratedText: $actualGeneratedText');
+
+        int endOfTextIndex = generatedIds.indexOf(_vocab['<|endoftext|>'] ?? 0);
+        if (endOfTextIndex == -1) {
+            endOfTextIndex = generatedIds.length; // No end-of-text found, take all
+        }
+
+        final finalGeneratedText = _decode(generatedIds.sublist(0, endOfTextIndex)).trim();
+
+        return finalGeneratedText;
     }
 
     // Helper functions
-    List<int> _encode(String text) {
+    List<int> _encode(String text, {required int expectedLength}) {
         List<String> tokens = text.runes.map((rune) => String.fromCharCode(rune)).toList();
 
         // Apply merge rules
@@ -70,8 +99,15 @@ class TextGenerator {
             }
         }
 
-        // convert tokens to IDs
-        return tokens.map((token) => _vocab[token] ?? _vocab['<|endoftext|>']!).toList();
+        List<int> encodedTokens = tokens.map((token) => _vocab[token] ?? _vocab['<|endoftext|>']!).toList();
+
+        if (encodedTokens.length < expectedLength) {
+            encodedTokens.addAll(List.filled(expectedLength - encodedTokens.length, 0));
+        } else if (encodedTokens.length > expectedLength) {
+            encodedTokens = encodedTokens.sublist(0, expectedLength);
+        }
+
+        return encodedTokens;
     }
 
     String _decode(List<int> tokenIds) {

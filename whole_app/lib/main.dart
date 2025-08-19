@@ -15,15 +15,13 @@ class _MyAppState extends State<MyApp> {
   String _generatedText = '';
   final TextGenerator _textGenerator = TextGenerator();
 
+  // Use a Future to track the loading state of the model
+  late Future<void> _loadingModelFuture;
+
   @override
   void initState() {
     super.initState();
-    _loadModel();
-  }
-
-  Future<void> _loadModel() async {
-    await _textGenerator.loadModel();
-    setState(() {});   // Refresh UI after model load
+    _loadingModelFuture = _textGenerator.loadModel();
   }
 
   void _generateText() {
@@ -48,9 +46,25 @@ class _MyAppState extends State<MyApp> {
                 controller: _promptController,
                 decoration: const InputDecoration(labelText: 'Enter your prompt'),
               ),
-              ElevatedButton(
-                onPressed: _generateText,
-                child: const Text('Generate Text'),
+
+              // Use FutureBuilder to show a loading indicator while the model is loading
+              FutureBuilder(
+                future: _loadingModelFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    if (snapshot.hasError) {
+                      return Text('Error loading model: ${snapshot.error}');
+                    } else {
+                      return ElevatedButton(
+                        onPressed: _generateText,
+                        child: const Text('Generate Text'),
+                      );
+                    }
+                  } else {
+                    // Model is still loading
+                    return const CircularProgressIndicator();
+                  }
+                },
               ),
               const SizedBox(height: 20),
               Text('Generated Text: $_generatedText'),

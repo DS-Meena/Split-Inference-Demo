@@ -63,6 +63,7 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
   assets:
+    - assets/gpt2-full.tflite
     - assets/gpt2.tflite
     - assets/vocab.json # Tokenizer files
     - assets/merges.txt
