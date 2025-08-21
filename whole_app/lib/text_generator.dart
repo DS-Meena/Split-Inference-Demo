@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:flutter_gpt_tokenizer/flutter_gpt_tokenizer.dart';
@@ -41,6 +42,7 @@ class TextGenerator {
         _tokenizer = Tokenizer();
         List<int> inputTokens = await _tokenizer.encode(prompt, modelName: "text-davinci-002");
 
+        inputTokens = List<int>.from(inputTokens);
         const expectedLength = 64;
         if (inputTokens.length < expectedLength) {
             inputTokens.addAll(List.filled(expectedLength - inputTokens.length, 0));
@@ -66,6 +68,7 @@ class TextGenerator {
         print('output of interpreter is $output');
 
         // process the output to get the generated Ids
+        // choose id with max logit value from each output dimension (50)
         List<int> generatedIds = [];
         for (int i = 0; i < _outputSequenceLength; i++) {
             double maxLogit = -double.infinity;
@@ -80,29 +83,26 @@ class TextGenerator {
         }
         print('GeneratedIds are: $generatedIds');
 
-        final actualGeneratedText = _decode(generatedIds);
+        // Decode the generated Ids to text
+        Uint32List generatedIdsUint32 = Uint32List.fromList(generatedIds);
+
+        String actualGeneratedText = await _tokenizer.decode(
+            generatedIdsUint32,
+            modelName: "text-davinci-002",
+            allowedSpecialTokens: ['<|endoftext|>'],
+        );
+
+        // final actualGeneratedText = _decode(generatedIds);
         print('actualGeneratedText: $actualGeneratedText');
+        
+        // int endOfTextIndex = generatedIds.indexOf(_vocab['<|endoftext|>'] ?? 0);
+        // if (endOfTextIndex == -1) {
+        //     endOfTextIndex = generatedIds.length; // No end-of-text found, take all
+        // }
 
-        int endOfTextIndex = generatedIds.indexOf(_vocab['<|endoftext|>'] ?? 0);
-        if (endOfTextIndex == -1) {
-            endOfTextIndex = generatedIds.length; // No end-of-text found, take all
-        }
+        // final finalGeneratedText = _decode(generatedIds.sublist(0, endOfTextIndex)).trim();
 
-        final finalGeneratedText = _decode(generatedIds.sublist(0, endOfTextIndex)).trim();
-
-        return finalGeneratedText;
-    }
-
-    String _decode(List<int> tokenIds) {
-        final List<String> tokens = tokenIds.map((id) => _idToToken(id)).toList();
-        return tokens.join(' ');
-    }
-
-    String _idToToken(int id) {
-        return _vocab.entries.firstWhere(
-            (entry) => entry.value == id,
-            orElse: () => MapEntry('<|endoftext|>', _vocab['<|endoftext|>']!),
-        ).key;
+        return actualGeneratedText;
     }
 
     void dispose() {

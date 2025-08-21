@@ -24,12 +24,12 @@ class _MyAppState extends State<MyApp> {
     _loadingModelFuture = _textGenerator.loadModel();
   }
 
-  void _generateText() {
+  Future<void> _generateText() async {
     final prompt = _promptController.text;
-    final generated = _textGenerator.generateText(prompt);
+    final generated = await _textGenerator.generateText(prompt);
 
     setState(() {
-      _generatedText = generated.toString();
+      _generatedText = generated;
     });
   }
 
