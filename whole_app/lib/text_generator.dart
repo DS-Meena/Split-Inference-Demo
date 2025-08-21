@@ -19,10 +19,12 @@ class TextGenerator {
         // Load the vocabulary file
         final String vocabString = await rootBundle.loadString('assets/vocab.json');
         _vocab = Map<String, int>.from(json.decode(vocabString));
+        print('vocab is following: $_vocab');
 
         final String mergesString = await rootBundle.loadString('assets/merges.txt');
         _merges = mergesString.split('\n').map((line) => line.split(' ')).toList();
-        
+        print('merges is following: $_merges');
+
         // Get and store the output tensor shape
         final outputTensor = _interpreter.getOutputTensor(0);
         _outputSequenceLength = outputTensor.shape[1]; // Should be 64
@@ -34,12 +36,17 @@ class TextGenerator {
         print("Enter generateText");
         // Convert prompt to input tensor using vocabulary
         final inputTokens = _encode(prompt, expectedLength: 64);
+        final inputs = [[inputTokens]];
 
-        final output = List.filled(1 * _outputSequenceLength * _vocabSize, 0.0).reshape([1, _outputSequenceLength, _vocabSize]);
+        var output = List.filled(1 * _outputSequenceLength * _vocabSize, 0.0).reshape([1, _outputSequenceLength, _vocabSize]);
+        var output_tmp = List.filled(1 * 2 * 12 * 64 * 64, 0).reshape([1, 2, 12, 64, 64]);
+        var map = <int, Object>{};
+        map[0] = output;
+        for (int i=1; i<=12; i++) {
+            map[i] = output_tmp;
+        }
 
-        print("Before inference: $inputTokens");
-        _interpreter.run([inputTokens], output);
-        print("After inference");
+        _interpreter.runForMultipleInputs(inputs, map);
         print('output of interpreter is $output');
 
         // process the output to get the generated Ids
@@ -73,6 +80,7 @@ class TextGenerator {
     // Helper functions
     List<int> _encode(String text, {required int expectedLength}) {
         List<String> tokens = text.runes.map((rune) => String.fromCharCode(rune)).toList();
+        print("tokens are $tokens");
 
         // Apply merge rules
         for (final merge in _merges) {
@@ -99,7 +107,13 @@ class TextGenerator {
             }
         }
 
-        List<int> encodedTokens = tokens.map((token) => _vocab[token] ?? _vocab['<|endoftext|>']!).toList();
+        print("tokens after $tokens");
+        // remove space " " from tokens
+        tokens.removeWhere((token) => token == " ");
+        
+        List<int> encodedTokens = tokens.map((token) => _vocab[token] ?? _vocab['<|endoftext|>'] ?? 0).toList();
+        print("encodedTokens are $encodedTokens");
+
 
         if (encodedTokens.length < expectedLength) {
             encodedTokens.addAll(List.filled(expectedLength - encodedTokens.length, 0));
@@ -112,7 +126,7 @@ class TextGenerator {
 
     String _decode(List<int> tokenIds) {
         final List<String> tokens = tokenIds.map((id) => _idToToken(id)).toList();
-        return tokens.join('');
+        return tokens.join(' ');
     }
 
     String _idToToken(int id) {
