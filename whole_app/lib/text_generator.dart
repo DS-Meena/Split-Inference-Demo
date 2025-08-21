@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:flutter_gpt_tokenizer/flutter_gpt_tokenizer.dart';
 
 class TextGenerator {
     late Interpreter _interpreter;
+    late Tokenizer _tokenizer;
     late Map<String, int> _vocab;
     late List<List<String>> _merges;
     late int _outputSequenceLength;
@@ -32,10 +34,23 @@ class TextGenerator {
         print('Output Tensor shape: ${outputTensor.shape}');
     }
 
-    String generateText(String prompt, {int maxLength = 50}) {
+    Future<String> generateText(String prompt, {int maxLength = 50}) async {
         print("Enter generateText");
-        // Convert prompt to input tensor using vocabulary
-        final inputTokens = _encode(prompt, expectedLength: 64);
+
+        // Tokenization
+        _tokenizer = Tokenizer();
+        List<int> inputTokens = await _tokenizer.encode(prompt, modelName: "text-davinci-002");
+
+        const expectedLength = 64;
+        if (inputTokens.length < expectedLength) {
+            inputTokens.addAll(List.filled(expectedLength - inputTokens.length, 0));
+        } else if (inputTokens.length > expectedLength) {
+            inputTokens = inputTokens.sublist(0, expectedLength);
+        }
+        
+        print('Encoded tokens before: $inputTokens');
+
+        // Do inference (using multiple outputs options, only index 0 output matters)
         final inputs = [[inputTokens]];
 
         var output = List.filled(1 * _outputSequenceLength * _vocabSize, 0.0).reshape([1, _outputSequenceLength, _vocabSize]);
@@ -47,6 +62,7 @@ class TextGenerator {
         }
 
         _interpreter.runForMultipleInputs(inputs, map);
+
         print('output of interpreter is $output');
 
         // process the output to get the generated Ids
@@ -75,53 +91,6 @@ class TextGenerator {
         final finalGeneratedText = _decode(generatedIds.sublist(0, endOfTextIndex)).trim();
 
         return finalGeneratedText;
-    }
-
-    // Helper functions
-    List<int> _encode(String text, {required int expectedLength}) {
-        List<String> tokens = text.runes.map((rune) => String.fromCharCode(rune)).toList();
-        print("tokens are $tokens");
-
-        // Apply merge rules
-        for (final merge in _merges) {
-            if (merge.length != 2) {
-                continue;
-            } 
-            final newCompoundToken = merge.join('');
-
-            // Continuously apply the merge rule until no more instances of the pair are found
-            while(true) {
-                int bestIndex = -1;
-                for (int i=0; i<tokens.length - 1; i++) {
-                    if (tokens[i] == merge[0] && tokens[i+1] == merge[1]) {
-                        bestIndex = i;
-                        break;
-                    }
-                }
-
-                if (bestIndex != -1) {
-                    tokens.replaceRange(bestIndex, bestIndex+2, [newCompoundToken]);
-                } else {
-                    break;
-                }
-            }
-        }
-
-        print("tokens after $tokens");
-        // remove space " " from tokens
-        tokens.removeWhere((token) => token == " ");
-        
-        List<int> encodedTokens = tokens.map((token) => _vocab[token] ?? _vocab['<|endoftext|>'] ?? 0).toList();
-        print("encodedTokens are $encodedTokens");
-
-
-        if (encodedTokens.length < expectedLength) {
-            encodedTokens.addAll(List.filled(expectedLength - encodedTokens.length, 0));
-        } else if (encodedTokens.length > expectedLength) {
-            encodedTokens = encodedTokens.sublist(0, expectedLength);
-        }
-
-        return encodedTokens;
     }
 
     String _decode(List<int> tokenIds) {

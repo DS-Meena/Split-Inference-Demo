@@ -29,7 +29,7 @@ class _MyAppState extends State<MyApp> {
     final generated = _textGenerator.generateText(prompt);
 
     setState(() {
-      _generatedText = generated;
+      _generatedText = generated.toString();
     });
   }
 
