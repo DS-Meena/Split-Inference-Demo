@@ -14,7 +14,7 @@ class TextGenerator {
 
     Future<void> loadModel() async {
         // Load the TFLite model
-        _interpreter = await Interpreter.fromAsset('assets/gpt2-full.tflite');
+        _interpreter = await Interpreter.fromAsset('assets/gpt2-large.tflite');
         print('Input Tensor shape: ${_interpreter.getInputTensor(0).shape}');
         print('Output Tensor shape: ${_interpreter.getOutputTensor(0).shape}');
         print('Output Tensor type: ${_interpreter.getOutputTensor(0).type}');
