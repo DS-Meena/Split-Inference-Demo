@@ -92,16 +92,8 @@ class TextGenerator {
             allowedSpecialTokens: ['<|endoftext|>'],
         );
 
-        // final actualGeneratedText = _decode(generatedIds);
         print('actualGeneratedText: $actualGeneratedText');
         
-        // int endOfTextIndex = generatedIds.indexOf(_vocab['<|endoftext|>'] ?? 0);
-        // if (endOfTextIndex == -1) {
-        //     endOfTextIndex = generatedIds.length; // No end-of-text found, take all
-        // }
-
-        // final finalGeneratedText = _decode(generatedIds.sublist(0, endOfTextIndex)).trim();
-
         return actualGeneratedText;
     }
 
