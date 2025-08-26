@@ -3,3 +3,4 @@
 *.tflite
 __pycache__/
 build/
+saved_model/

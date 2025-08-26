@@ -1,22 +1,17 @@
 import tensorflow as tf
-from transformers import TFAutoModelForCausalLM, AutoTokenizer
+from transformers import TFGPT2LMHeadModel
 
-model = TFAutoModelForCausalLM.from_pretrained("gpt2")
+# Save the model in a directory ------------
+model = TFGPT2LMHeadModel.from_pretrained("gpt2-large")
 
-# Save model
-tf_model_path = "./gpt2_model_direct"
-tf.saved_model.save(model, tf_model_path)
-print(f"Hugging Face TF model saved as TensorFlow SavedModel at: {tf_model_path}")
+saved_model_dir = "./saved_model"
 
-# Convert to TF Lite model
-converter = tf.lite.TFLiteConverter.from_saved_model(tf_model_path)
-converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tf.saved_model.save(model, saved_model_dir)
+print(f"Hugging Face TF model saved as TensorFlow SavedModel at: {saved_model_dir}")
 
+# Convert to TF Lite model ------------------
+converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir)
 tflite_model = converter.convert()
 
-with open('gpt2.tflite', 'wb') as f:
+with open('sahane.tflite', 'wb') as f:
     f.write(tflite_model)
-
-print("GPT-2 TFLite model created as gpt2.tflite")
-
-# Note -> This code works in Kaggle, but doesn't on Local system.

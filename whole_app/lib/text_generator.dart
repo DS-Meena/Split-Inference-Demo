@@ -7,80 +7,81 @@ import 'package:flutter_gpt_tokenizer/flutter_gpt_tokenizer.dart';
 class TextGenerator {
     late Interpreter _interpreter;
     late Tokenizer _tokenizer;
-    late Map<String, int> _vocab;
-    late List<List<String>> _merges;
-    late int _outputSequenceLength;
     late int _vocabSize;
+    
+    // For handling past_key_values across multiple inference steps
+    // final Map<int, Object> _pastKeyValues = {};
 
     Future<void> loadModel() async {
         // Load the TFLite model
-        _interpreter = await Interpreter.fromAsset('assets/gpt2-large.tflite');
-        print('Input Tensor shape: ${_interpreter.getInputTensor(0).shape}');
-        print('Output Tensor shape: ${_interpreter.getOutputTensor(0).shape}');
-        print('Output Tensor type: ${_interpreter.getOutputTensor(0).type}');
+        _interpreter = await Interpreter.fromAsset('assets/sahane.tflite');
+        print('Interpreter loaded successfully.');
 
-        // Load the vocabulary file
-        final String vocabString = await rootBundle.loadString('assets/vocab.json');
-        _vocab = Map<String, int>.from(json.decode(vocabString));
-        print('vocab is following: $_vocab');
+        // Print input/output tensors for debugging
+        for (var i = 0; i < _interpreter.getInputTensors().length; i++) {
+            print('Input Tensor $i shape: ${_interpreter.getInputTensor(i).shape}');
+        }
+        for (var i = 0; i < _interpreter.getOutputTensors().length; i++) {
+            print('Output Tensor $i shape: ${_interpreter.getOutputTensor(i).shape}');
+            print('Output Tensor $i type: ${_interpreter.getOutputTensor(i).type}');
+        }
 
-        final String mergesString = await rootBundle.loadString('assets/merges.txt');
-        _merges = mergesString.split('\n').map((line) => line.split(' ')).toList();
-        print('merges is following: $_merges');
+        // Initialize output tensor shapes for reuse (logits is on 2nd index)
+        _vocabSize = _interpreter.getOutputTensor(2).shape[2];
+        print('Output Tensor shape: ${_interpreter.getOutputTensor(2).shape}');
 
-        // Get and store the output tensor shape
-        final outputTensor = _interpreter.getOutputTensor(0);
-        _outputSequenceLength = outputTensor.shape[1]; // Should be 64
-        _vocabSize = outputTensor.shape[2]; // Should be 50257
-        print('Output Tensor shape: ${outputTensor.shape}');
+        // Initialize empty past_key_values for the first inference run
+        // for (int i = 0; i <= 12; i++) {
+        //     _pastKeyValues[i] = List.filled(2 * 1 * 12 * 1 * 64, 0.0).reshape([2, 1, 12, 1, 64]);
+        // }
     }
 
     Future<String> generateText(String prompt, {int maxLength = 50}) async {
         print("Enter generateText");
 
-        // Tokenization
         _tokenizer = Tokenizer();
         List<int> inputTokens = await _tokenizer.encode(prompt, modelName: "text-davinci-002");
+        print('Encoded tokens: $inputTokens');
 
-        inputTokens = List<int>.from(inputTokens);
-        const expectedLength = 64;
-        if (inputTokens.length < expectedLength) {
-            inputTokens.addAll(List.filled(expectedLength - inputTokens.length, 0));
-        } else if (inputTokens.length > expectedLength) {
-            inputTokens = inputTokens.sublist(0, expectedLength);
-        }
-        
-        print('Encoded tokens before: $inputTokens');
-
-        // Do inference (using multiple outputs options, only index 0 output matters)
-        final inputs = [[inputTokens]];
-
-        var output = List.filled(1 * _outputSequenceLength * _vocabSize, 0.0).reshape([1, _outputSequenceLength, _vocabSize]);
-        var output_tmp = List.filled(1 * 2 * 12 * 64 * 64, 0).reshape([1, 2, 12, 64, 64]);
-        var map = <int, Object>{};
-        map[0] = output;
-        for (int i=1; i<=12; i++) {
-            map[i] = output_tmp;
-        }
-
-        _interpreter.runForMultipleInputs(inputs, map);
-
-        print('output of interpreter is $output');
-
-        // process the output to get the generated Ids
-        // choose id with max logit value from each output dimension (50)
         List<int> generatedIds = [];
-        for (int i = 0; i < _outputSequenceLength; i++) {
+        List<int> currentInputTokens = List.from(inputTokens);
+
+        for (int i = 0; i < maxLength; i++) {
+
+            final int sequenceLength = currentInputTokens.length;
+            List<int> attentionMask = List.filled(sequenceLength, 1);
+            final inputs = [
+                Int32List.fromList(attentionMask).reshape([1, sequenceLength]),
+                Int32List.fromList(currentInputTokens).reshape([1, sequenceLength]),
+            ];
+
+            // Prepare outputs for the interpreter
+            var outputs = <int, Object>{};
+            // Re-use `_pastKeyValues` for subsequent steps (multiple output layers)
+            for (var j = 0; j <= 12; j++) {
+                outputs[j] = List.filled(2 * 1 * 12 * sequenceLength * 64, 0.0).reshape([2, 1, 12, sequenceLength, 64]);
+            }
+            // Main logits output
+            outputs[2] = List.filled(1 * sequenceLength * _vocabSize, 0.0).reshape([1, sequenceLength, _vocabSize]);
+
+            _interpreter.runForMultipleInputs(inputs, outputs);
+
+            // Process the logits output to get the next token
+            var logits = outputs[2] as List;
+            final lastLogits = logits[0][logits[0].length - 1];
             double maxLogit = -double.infinity;
             int predictedTokenId = 0;
             for (int j = 0; j < _vocabSize; j++) {
-                if (output[0][i][j] > maxLogit) { // Assuming output is Float32, adjust type if needed
-                    maxLogit = output[0][i][j];
+                if (lastLogits[j] > maxLogit) {
+                    maxLogit = lastLogits[j];
                     predictedTokenId = j;
                 }
             }
             generatedIds.add(predictedTokenId);
+            currentInputTokens.add(predictedTokenId);
+            print('Generated token: $predictedTokenId');
         }
+
         print('GeneratedIds are: $generatedIds');
 
         // Decode the generated Ids to text
@@ -93,7 +94,7 @@ class TextGenerator {
         );
 
         print('actualGeneratedText: $actualGeneratedText');
-        
+
         return actualGeneratedText;
     }
 
