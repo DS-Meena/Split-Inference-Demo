@@ -5,7 +5,7 @@ description = "GPT-2 Split inference client"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
-    {name="Dharam singh meena", email="dharam.meena@samsung.com"}
+    {name="Dharam singh meena", email="dharamsinghmeena2000@gamil.com"}
 ]
 dependencies = [
     "flet",
@@ -14,10 +14,7 @@ dependencies = [
 ]
 
 [tool.flet]
-org="com.samsung"
 product="NewNameForSplit"
-company = "Samsung"
-copyright = "Copyright (C) 2025 by Samsung"
 build_number = 1
 
 [tool.flet.app]
